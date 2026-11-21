@@ -1,0 +1,33 @@
+name: Android release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Build and verify the signed update
+        env:
+          STORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          UPDATE_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          umask 077
+          export KEYSTORE="$RUNNER_TEMP/borderfield.p12"
+          trap 'rm -f "$KEYSTORE"' EXIT
+          printf '%s' "$STORE_BASE64" | base64 --decode > "$KEYSTORE"
+          VERSION_NAME="${GITHUB_REF_NAME#v}" ./tools/build.sh
+      - name: Publish the APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" build/Borderfield.apk --verify-tag --title "Borderfield ${GITHUB_REF_NAME#v}" --generate-notes
