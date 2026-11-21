@@ -12,7 +12,7 @@ The app stores progress on the device. An update installed over the previous ver
 
 ## Install and update
 
-Open the signed APK on an Android device. Android may ask you to allow installs from the app that opened the download.
+Download the latest signed APK and open it on your Android device. Android may ask you to allow installs from the app that opened the download. [Download Borderfield.apk](https://github.com/bytexv/borderfield/releases/latest/download/Borderfield.apk)
 
 Borderfield checks its configured public GitHub Releases feed on launch, at most once daily after a successful check. Settings also includes a manual check and a switch for automatic checks. A newer stable release prompts you to download. The app verifies its size, SHA-256 digest when provided by GitHub, package ID, version and signing certificate before opening the Android installer. Android asks you to confirm installation.
 
@@ -32,21 +32,30 @@ The output is `build/Borderfield.apk`. Use the original signing key with alias `
 
 ## Publish releases
 
-The initial build targets the public repository `bytexv/borderfield`. When moving to another repository, set `UPDATE_REPO` at build time and distribute that build. Keep the package ID and signing key.
+Installed copies check the stable releases of `bytexv/borderfield`. Each update needs a higher three-part version, the original signing key and an asset named `Borderfield.apk`.
 
-1. Push this source, including `.github/workflows/release.yml`, to the destination repository on its default branch.
-2. Save the two signing values as encrypted repository Actions secrets. The example uses the GitHub CLI and the private signing backup for this app.
-3. Push a version tag. The workflow compiles, signs, verifies and publishes the APK to a stable GitHub Release. Use a higher three-part version for each update, such as `v1.0.1`.
+### Sign locally
+
+Set the build variables above and push the release commit to GitHub. From that commit, build the APK and upload it with the GitHub CLI. The command creates the matching tag and publishes the asset together with its release.
+
+```bash
+version=1.0.1
+VERSION_NAME="$version" ./tools/build.sh &&
+  gh release create "v$version" build/Borderfield.apk --repo "$UPDATE_REPO" \
+    --target "$(git rev-parse HEAD)" --title "Borderfield $version" --generate-notes
+```
+
+### Sign with GitHub Actions
+
+For automatic signing on tag pushes, a repository administrator can configure the two encrypted Actions secrets once using the private signing backup. With both secrets present, pushing a new version tag compiles, signs and publishes the update.
 
 ```bash
 repo=bytexv/borderfield
 base64 -w0 /private/path/borderfield.p12 | gh secret set ANDROID_KEYSTORE_BASE64 --repo "$repo"
 tr -d '\n' < /private/path/release.pass | gh secret set ANDROID_KEYSTORE_PASSWORD --repo "$repo"
-git tag v1.0.0
-git push origin v1.0.0
+git tag v1.0.1
+git push origin v1.0.1
 ```
-
-For a manual release, run the local build with the release version, then upload the signed asset to the corresponding published GitHub Release under the exact name `Borderfield.apk`. Every release must come from the same signing identity.
 
 ## Cartography and credits
 
