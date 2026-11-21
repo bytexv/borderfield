@@ -86,8 +86,8 @@ public final class MainActivity extends Activity {
             if (!manual && System.currentTimeMillis()-last < 86400000L) return;
             if (!checking.compareAndSet(false,true)) return;
             network.execute(() -> {
-                try { findRelease(manual); }
-                catch (Exception e) { if (manual) status("Couldn’t check GitHub. Check your connection and try again."); }
+                try { findRelease(); }
+                catch (Exception e) { status("Couldn’t check GitHub. Check your connection and try again."); }
                 finally { checking.set(false); }
             });
         }
@@ -106,12 +106,12 @@ public final class MainActivity extends Activity {
     }
     private void checked() { getPreferences(MODE_PRIVATE).edit().putLong("lastCheck",System.currentTimeMillis()).apply(); }
 
-    private void findRelease(boolean manual) throws Exception {
+    private void findRelease() throws Exception {
         HttpURLConnection con = connect("https://api.github.com/repos/"+Release.REPOSITORY+"/releases/latest");
         JSONObject release;
         try {
             con.setRequestProperty("Accept","application/vnd.github+json");
-            if (con.getResponseCode()==404) { checked(); if (manual) status("No public release is available in the update repository yet."); return; }
+            if (con.getResponseCode()==404) { checked(); status("No public release is available in the update repository yet."); return; }
             try (InputStream in = con.getInputStream(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 byte[] buffer = new byte[8192];
                 int n;
@@ -124,8 +124,8 @@ public final class MainActivity extends Activity {
         } finally { con.disconnect(); }
         String tag = release.getString("tag_name");
         int next = versionCode(tag);
-        if (next<=0) { if (manual) status("The latest release has an unrecognized version tag."); return; }
-        if (next<=installed.versionCode) { checked(); if (manual) status("You have the latest version ("+installed.versionName+")."); return; }
+        if (next<=0) { status("The latest release has an unrecognized version tag."); return; }
+        if (next<=installed.versionCode) { checked(); status("You have the latest version ("+installed.versionName+")."); return; }
         JSONArray assets = release.getJSONArray("assets");
         for (int i=0;i<assets.length();i++) {
             JSONObject asset = assets.getJSONObject(i);
@@ -141,7 +141,7 @@ public final class MainActivity extends Activity {
                 .setNegativeButton("Later",null).setPositiveButton("Download",(d,w) -> download(url,digest,size,next)).show(); });
             return;
         }
-        if (manual) status("The latest release has no Android APK yet.");
+        status("The latest release has no Android APK yet.");
     }
 
     static int versionCode(String tag) {
