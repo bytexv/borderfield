@@ -2,6 +2,14 @@ name: Android release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish
+        required: true
+        type: string
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 permissions:
   contents: read
 jobs:
@@ -10,7 +18,9 @@ jobs:
     outputs:
       mode: ${{ steps.source.outputs.mode }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
       - name: Select the signed APK source
         id: source
         env:
@@ -31,13 +41,18 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Ensure Android SDK 35 is installed
+        run: |
+          if [ ! -x "$ANDROID_HOME/build-tools/35.0.0/apksigner" ] || [ ! -f "$ANDROID_HOME/platforms/android-35/android.jar" ]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-35' 'build-tools;35.0.0'
+          fi
       - name: Use the locally signed APK
         if: needs.prepare.outputs.mode == 'staged'
         run: |
@@ -55,10 +70,10 @@ jobs:
           export KEYSTORE="$RUNNER_TEMP/borderfield.p12"
           trap 'rm -f "$KEYSTORE"' EXIT
           printf '%s' "$STORE_BASE64" | base64 --decode > "$KEYSTORE"
-          VERSION_NAME="${GITHUB_REF_NAME#v}" ./tools/build.sh
+          VERSION_NAME="${RELEASE_TAG#v}" ./tools/build.sh
       - name: Verify the release identity and version
-        run: ./tools/verify-release.sh "$GITHUB_REF_NAME" build/Borderfield.apk
+        run: ./tools/verify-release.sh "$RELEASE_TAG" build/Borderfield.apk
       - name: Publish the APK
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" build/Borderfield.apk --verify-tag --title "Borderfield ${GITHUB_REF_NAME#v}" --generate-notes
+        run: gh release create "$RELEASE_TAG" build/Borderfield.apk --verify-tag --title "Borderfield ${RELEASE_TAG#v}" --generate-notes
