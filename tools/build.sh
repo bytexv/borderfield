@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 : "${KEYSTORE:?Set KEYSTORE to the private release keystore}"
 : "${KEYSTORE_PASSWORD:?Set KEYSTORE_PASSWORD to the keystore password}"
 export KEYSTORE_PASSWORD
-version=${VERSION_NAME:-1.0.0}
+version=${VERSION_NAME:-1.0.1}
 repo=${UPDATE_REPO:-bytexv/borderfield}
 [[ "$repo" =~ ^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$ ]] || { echo "Invalid repository" >&2; exit 1; }
 [[ "$version" =~ ^([1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})$ ]] || { echo "Expected MAJOR.MINOR.PATCH" >&2; exit 1; }

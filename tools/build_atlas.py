@@ -15,15 +15,19 @@ from shapely.ops import transform, unary_union
 ROOT = Path(__file__).resolve().parents[1]
 names = {'COG':'Republic of the Congo', 'COD':'DR Congo','CIV':'Côte d’Ivoire','CPV':'Cabo Verde'}
 aliases = {
-    'GBR':['UK','Great Britain','Britain'], 'USA':['USA','US','America','United States of America'],
-    'ARE':['UAE','United Arab Emirates'], 'CIV':['Ivory Coast','Cote d Ivoire'], 'CPV':['Cape Verde'],
-    'TUR':['Turkey'], 'COD':['DRC','Congo Kinshasa','Democratic Republic of Congo','Democratic Republic of the Congo'],
-    'COG':['Congo Brazzaville','Republic of Congo','Congo'], 'KOR':['Republic of Korea'], 'PRK':['DPRK'],
+    'GBR':['UK','Great Britain','Britain','Britian','Great Britian','Britain and Northern Ireland'], 'USA':['USA','US','America','United States of America'],
+    'ARE':['UAE','United Arab Emirates','The Emirates'], 'CIV':['Ivory Coast','Cote d Ivoire'], 'CPV':['Cape Verde'],
+    'TUR':['Turkey'], 'COD':['DRC','D R Congo','Congo Kinshasa','Democratic Republic of Congo','Democratic Republic of the Congo'],
+    'COG':['Congo Brazzaville','Republic of Congo','Congo'], 'KOR':['Republic of Korea','S Korea'], 'PRK':['DPRK','N Korea'],
     'MMR':['Burma'], 'CZE':['Czech Republic'], 'SWZ':['Swaziland'], 'TLS':['East Timor'],
     'FSM':['Federated States of Micronesia'], 'VAT':['Holy See','Vatican'], 'RUS':['Russian Federation'],
-    'LAO':['Lao PDR'], 'MKD':['Macedonia'], 'PSE':['State of Palestine'], 'KNA':['St Kitts and Nevis'],
-    'VCT':['St Vincent and the Grenadines'], 'LCA':['St Lucia'], 'STP':['Sao Tome and Principe'],
-    'BIH':['Bosnia','Bosnia Herzegovina'], 'KIR':['Republic of Kiribati'], 'TZA':['United Republic of Tanzania']
+    'LAO':['Lao PDR'], 'MKD':['Macedonia'], 'PSE':['State of Palestine'], 'KNA':['St Kitts and Nevis','St Kitts','Saint Kitts'],
+    'VCT':['St Vincent and the Grenadines','St Vincent','Saint Vincent'], 'LCA':['St Lucia'], 'STP':['Sao Tome and Principe','Sao Tome'],
+    'BIH':['Bosnia','Bosnia Herzegovina'], 'KIR':['Republic of Kiribati'], 'TZA':['United Republic of Tanzania'],
+    'ATG':['Antigua'], 'TTO':['Trinidad'], 'CAF':['CAR'],
+    'PNG':['PNG'], 'NZL':['NZ'], 'KAZ':['Kazakstan'], 'KGZ':['Kirgizstan','Kyrgizstan'],
+    'PHL':['Phillipines','Phillippines','Philipines'], 'COL':['Columbia'],
+    'AFG':['Afganistan'], 'SAU':['Saudi'], 'BHS':['The Bahamas']
 }
 capitals = {'NRU':'Yaren (seat of government)', 'LKA':'Sri Jayawardenepura Kotte (legislative), Colombo (executive and judicial)',
             'PSE':'East Jerusalem (claimed), Ramallah (administrative)', 'BOL':'Sucre (constitutional), La Paz (seat of government)',

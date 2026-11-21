@@ -20,8 +20,36 @@ const icons = {
 function icon(name){return '<svg aria-hidden="true" class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icons[name]+'</svg>';}
 const logo='<svg aria-hidden="true" class="mark" viewBox="0 0 36 36"><rect width="36" height="36" rx="8" fill="#263d33"/><circle cx="18" cy="18" r="12.2" fill="none" stroke="#dcefaa" stroke-dasharray="1 3"/><path d="m24.8 7.8-3.5 13.4-10.1 7 3.4-13.3z" fill="#dff39e"/><path d="m24.8 7.8-7 10.2-3.2-3.1z" fill="#8faa72"/><circle cx="18" cy="18" r="1.5" fill="#233a30"/></svg>';
 const escapeHtml = str => String(str).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-function norm(str){return str.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,'and').replace(/^the\s+/,'').replace(/[^a-z0-9]/g,'');}
-const answers = new Map(ATLAS.map(c=>[c.id,new Set(c.aliases.map(norm))]));
+function norm(str){return str.trim().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/&/g,'and').replace(/^the\s+/,'').replace(/[^a-z0-9]/g,'');}
+const countriesByAnswer = new Map();
+for (const country of ATLAS) {
+  for (const alias of country.aliases) countriesByAnswer.set(norm(alias), country);
+}
+// Some complete answers also begin longer answers (Niger/Nigeria, US/USA).
+// Wait for a short pause on these names so a continuing word stays intact.
+const extendableNames = new Set();
+for (const alias of countriesByAnswer.keys()) {
+  for (let end = 1; end < alias.length; end++) {
+    const prefix = alias.slice(0,end);
+    if (countriesByAnswer.has(prefix)) extendableNames.add(prefix);
+  }
+}
+let nameTimer;
+function checkTypedName(input) {
+  if (input.id !== 'map-guess' && input.id !== 'guess') return;
+  clearTimeout(nameTimer);
+  const guess = norm(input.value);
+  const country = countriesByAnswer.get(guess);
+  if (!country) return;
+  if (input.id === 'guess' && current().ids[current().index] !== country.id) return;
+  function accept() {
+    if (!input.isConnected || norm(input.value) !== guess) return;
+    if (input.id === 'map-guess') submitMapCountry(true);
+    else answer();
+  }
+  if (extendableNames.has(guess)) nameTimer = setTimeout(accept,1100);
+  else accept();
+}
 const fresh = {known:[],saved:[],missed:[],rounds:0,sessions:{},auto:true};
 let data;
 try{data=Object.assign({},fresh,JSON.parse(localStorage.getItem('borderfield.v1'))||{});}catch(e){data=Object.assign({},fresh);}
@@ -39,15 +67,17 @@ function context(back,meta){return '<header class="top context"><button class="b
 function nav(active){return '<nav class="nav" aria-label="Main navigation">'+[['desk','desk','Field desk'],['guide','book','Field guide'],['log','chart','Logbook']].map(([id,i,n])=>'<button class="'+(id===active?'current':'')+'" '+(id===active?'aria-current="page"':'')+' data-act="'+id+'"><span class="ico">'+icon(i)+'</span>'+n+'</button>').join('')+'</nav>';}
 function layout(content,active,top,cls){root.innerHTML='<div class="shell '+(cls||'')+'">'+(top||header())+'<main class="main">'+content+'</main>'+(active?nav(active):'')+'</div>';}
 function openScreen(next){screen=next;draw();window.scrollTo(0,0);}
-function draw(){({desk:desk,guide:guide,detail:detail,log:logbook,quiz:quiz,result:result,settings:settings})[screen]();}
+function draw(){({desk:desk,guide:guide,detail:detail,log:logbook,quiz:quiz,map:mapQuiz,result:result,settings:settings})[screen]();}
 function desk(){
-  const c=dailyCountry(), date=new Date(), resumed=!!data.sessions.world && !data.sessions.world.done;
+  const c=dailyCountry(), date=new Date(), map=data.sessions.map, legacy=data.sessions.world;
+  const mapAction=map&&map.named.length===ATLAS.length?'View map':map&&map.named.length?'Resume map':'Start map';
   const day=date.toLocaleDateString('en-US',{weekday:'long'}), stamp=date.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
   layout('<div class="heading"><h1>Field desk</h1><div class="date">'+day+'<b>'+stamp+'</b></div></div>'+
-    '<section class="hero"><div class="hero-graphic"><img src="art/globe.svg" alt=""></div><div class="kicker">'+icon('scope')+'World quiz</div><h2>Name the<br>world.</h2><p>195 countries · Untimed</p><button class="cta" data-act="world">'+(resumed?'Resume quiz':'Start quiz')+icon('arrow')+'</button></section>'+
+    '<section class="hero"><div class="hero-graphic"><img src="art/globe.svg" alt=""></div><div class="kicker">'+icon('scope')+'World map quiz</div><h2>Name the<br>world.</h2><p>195 countries · Any order</p><button class="cta" data-act="world">'+mapAction+icon('arrow')+'</button></section>'+
     '<div class="subhead"><h2>Ways to practice</h2></div><div class="routes">'+
     '<button class="route" data-act="guide"><img class="route-art" src="art/map.svg" alt="">'+icon('upRight')+'<strong>Field guide</strong><small>Study the outlines</small></button>'+
     '<button class="route quick" data-act="quick"><img class="route-art" src="art/timer.svg" alt="">'+icon('upRight')+'<strong>Quick round</strong><small>10 random countries</small></button></div>'+
+    (legacy&&!legacy.done?'<button class="actionrow" data-act="legacy"><span class="grow"><strong>Resume your outline quiz</strong><small>Country '+(legacy.index+1)+' of '+legacy.ids.length+'</small></span>'+icon('next')+'</button>':'')+
     '<div class="subhead"><h2>Country of the day</h2></div><button class="daily" data-act="daily">'+thumb(c)+'<span class="grow"><strong>'+escapeHtml(c.name)+'</strong><small>'+c.region+'</small></span>'+icon('next')+'</button>','desk');
 }
 function guide(){
@@ -91,9 +121,16 @@ function quiz(){
 function answer(){
   const s=current();if(s.outcome)return;const c=countries.get(s.ids[s.index]),input=document.getElementById('guess'),guess=norm(input.value);
   if(!guess){input.focus();return;}
-  if(answers.get(c.id).has(guess)){
+  if(countriesByAnswer.get(guess)===c){
     s.outcome='correct';s.score++;add(data.known,c.id);
-    if(!s.wrong&&!s.hints)remove(data.missed,c.id);save();quiz();announce('Correct. '+c.name);
+    if(!s.wrong&&!s.hints)remove(data.missed,c.id);
+    advance();
+    if(screen==='quiz'){
+      const message=document.getElementById('message');
+      message.className='map-message map-success';
+      message.textContent='✓ '+c.name+' named.';
+      document.getElementById('guess').focus();
+    }else announce('Round complete.');
   }else{
     s.wrong=true;add(data.missed,c.id);save();quizMsg='Try another name, or use a hint.';
     document.getElementById('message').innerHTML='<p class="feedback warn">'+quizMsg+'</p>';input.focus();input.select();
@@ -112,8 +149,8 @@ function logbook(){const count=data.known.length,pct=Math.round(count/ATLAS.leng
     '<div class="subhead"><h2>By region</h2></div>'+regions.map(r=>{const set=ATLAS.filter(c=>c.region===r),v=set.filter(c=>data.known.includes(c.id)).length;return '<div class="region-row"><div class="between"><strong>'+r+'</strong><span class="meta">'+v+' / '+set.length+'</span></div><div class="meter"><i style="width:'+v/set.length*100+'%"></i></div></div>';}).join(''),'log');
 }
 function settings(){
-  const version=window.Borderfield?window.Borderfield.version():'1.0.0';
-  layout('<h1 class="title">Settings</h1><div class="subhead"><h2>App updates</h2><small>v'+escapeHtml(version)+'</small></div><div class="setting"><span class="grow"><strong>Check on launch</strong><small>Look for a new GitHub release once a day.</small></span><button class="chip '+(data.auto?'sel':'')+'" data-act="auto" role="switch" aria-checked="'+data.auto+'" aria-label="Check on launch">'+(data.auto?'On':'Off')+'</button></div><button class="actionrow" data-act="updates"><span class="icon-stand">'+icon('download')+'</span><span class="grow"><strong>Check for updates</strong></span>'+icon('next')+'</button><p class="intro" role="status">'+escapeHtml(notice)+'</p><div class="subhead"><h2>About the atlas</h2></div><p class="intro">195 countries: the 193 United Nations members, Palestine and Vatican City. Progress and bookmarks are stored on this device.</p><p class="intro">Outlines use a separate scale for each country. Tiny islands are enlarged as dots. Study labels identify selected mainland or island views.</p><p class="license">Cartography: Natural Earth, 1:10m, public domain. Country data adapted from mledoze/countries under ODbL 1.0. Map boundaries follow the source cartography. Fonts: Barlow Condensed, DM Sans and IBM Plex Mono under the SIL Open Font License.</p>',null,context('Back','Borderfield'));
+  const version=window.Borderfield?window.Borderfield.version():'1.0.1';
+  layout('<h1 class="title">Settings</h1><div class="subhead"><h2>App updates</h2><small>v'+escapeHtml(version)+'</small></div><div class="setting"><span class="grow"><strong>Check on launch</strong><small>Look for a new GitHub release once a day.</small></span><button class="chip '+(data.auto?'sel':'')+'" data-act="auto" role="switch" aria-checked="'+data.auto+'" aria-label="Check on launch">'+(data.auto?'On':'Off')+'</button></div><button class="actionrow" data-act="updates"><span class="icon-stand">'+icon('download')+'</span><span class="grow"><strong>Check for updates</strong></span>'+icon('next')+'</button><p class="intro" role="status">'+escapeHtml(notice)+'</p><div class="subhead"><h2>About the atlas</h2></div><p class="intro">195 countries: the 193 United Nations members, Palestine and Vatican City. Progress and bookmarks are stored on this device.</p><p class="intro">The world map uses the Equal Earth projection. Dots mark small countries. Individual study cards use their own scale and label any mainland or island detail views.</p><p class="license">Cartography: Natural Earth, 1:10m, public domain. Country data adapted from mledoze/countries under ODbL 1.0. Map boundaries follow the source cartography. Fonts: Barlow Condensed, DM Sans and IBM Plex Mono under the SIL Open Font License.</p>',null,context('Back','Borderfield'));
 }
 function back(){
   if(screen==='desk')return false;
@@ -125,13 +162,28 @@ function back(){
 }
 window.borderfieldBack=back;
 window.onUpdateStatus=message=>{notice=message;if(screen==='settings')settings();};
-root.addEventListener('input',ev=>{if(ev.target.id==='search'){query=ev.target.value;list();}if(ev.target.id==='guess')draft=ev.target.value;});
-root.addEventListener('submit',ev=>{if(ev.target.id==='answerform'){ev.preventDefault();answer();}});
+root.addEventListener('input',ev=>{
+  if(ev.target.id==='search'){query=ev.target.value;list();}
+  if(ev.target.id==='guess')draft=ev.target.value;
+  if(!ev.isComposing)checkTypedName(ev.target);
+});
+root.addEventListener('compositionstart',()=>clearTimeout(nameTimer));
+root.addEventListener('compositionend',ev=>{
+  const input=ev.target;
+  setTimeout(()=>{if(input.isConnected)checkTypedName(input);},0);
+});
+root.addEventListener('submit',ev=>{if(ev.target.id==='answerform'){ev.preventDefault();answer();}
+  if(ev.target.id==='map-form'){ev.preventDefault();submitMapCountry();}});
 root.addEventListener('click',ev=>{
   const button=ev.target.closest('[data-act]');if(!button||button.disabled)return;const act=button.dataset.act;
   if(['desk','log','guide'].includes(act)){if(act==='guide'){filter='All';query='';}openScreen(act);return;}
-  if(['world','quick','review'].includes(act)){start(act);return;}
+  if(['quick','review'].includes(act)){start(act);return;}
   switch(act){
+    case 'world':startMap();break;
+    case 'new-map':if(data.sessions.map.named.length===ATLAS.length)startMap(true);break;
+    case 'zoom-in':zoomMap(2);break;
+    case 'zoom-out':zoomMap(.5);break;
+    case 'legacy':start('world');break;
     case 'settings':settingsOrigin=screen;openScreen('settings');break;
     case 'back':back();break;
     case 'filter':filter=button.dataset.id;for(const el of document.querySelectorAll('.chip[data-act="filter"]')){el.classList.toggle('sel',el.dataset.id===filter);el.setAttribute('aria-pressed',el.dataset.id===filter);}list();break;
@@ -148,5 +200,7 @@ root.addEventListener('click',ev=>{
     case 'updates':notice='Checking GitHub…';settings();if(window.Borderfield)window.Borderfield.checkUpdates(true);else window.onUpdateStatus('Update checks are available in the Android app.');break;
   }
 });
-desk();
-if(data.auto&&window.Borderfield)window.Borderfield.checkUpdates(false);
+document.addEventListener('DOMContentLoaded',()=>{
+  desk();
+  if(data.auto&&window.Borderfield)window.Borderfield.checkUpdates(false);
+});
