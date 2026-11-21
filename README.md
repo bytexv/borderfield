@@ -36,13 +36,12 @@ Installed copies check the stable releases of `bytexv/borderfield`. Each update 
 
 ### Sign locally
 
-Set the build variables above and push the release commit to GitHub. From that commit, build the APK and upload it with the GitHub CLI. The command creates the matching tag and publishes the asset together with its release.
+Set the build variables above and push the release source to `main`. Build the APK from that commit and run the publishing script. It verifies the original signing certificate, package ID and version, then pushes a tag containing the signed APK. GitHub Actions verifies that file again and attaches it to the public release. The signing key stays on your machine.
 
 ```bash
 version=1.0.1
 VERSION_NAME="$version" ./tools/build.sh &&
-  gh release create "v$version" build/Borderfield.apk --repo "$UPDATE_REPO" \
-    --target "$(git rev-parse HEAD)" --title "Borderfield $version" --generate-notes
+  ./tools/publish-signed.sh "v$version"
 ```
 
 ### Sign with GitHub Actions
